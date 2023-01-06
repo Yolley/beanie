@@ -573,6 +573,9 @@ class FindMany(
             document_model=self.document_model,
             projection_model=projection_model,
             find_query=self.get_filter_query(),
+            sort_expressions=self.sort_expressions,
+            limit_number=self.limit_number,
+            skip_number=self.skip_number,
             ignore_cache=ignore_cache,
             **pymongo_kwargs,
         ).set_session(session=self.session)

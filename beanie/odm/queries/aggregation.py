@@ -6,6 +6,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Generic,
+    Tuple,
     TypeVar,
 )
 
@@ -14,6 +15,7 @@ from pydantic import BaseModel
 from motor.core import AgnosticCommandCursor
 
 from beanie.odm.cache import LRUCache
+from beanie.odm.enums import SortDirection
 from beanie.odm.interfaces.clone import CloneInterface
 from beanie.odm.interfaces.session import SessionMethods
 from beanie.odm.queries.cursor import BaseCursorQuery
@@ -45,6 +47,9 @@ class AggregationQuery(
         document_model: Type["DocType"],
         aggregation_pipeline: List[Mapping[str, Any]],
         find_query: Mapping[str, Any],
+        sort_expressions: List[Tuple[str, SortDirection]],
+        skip_number: int,
+        limit_number: int,
         projection_model: Optional[Type[BaseModel]] = None,
         ignore_cache: bool = False,
         **pymongo_kwargs
@@ -55,6 +60,9 @@ class AggregationQuery(
         self.document_model = document_model
         self.projection_model = projection_model
         self.find_query = find_query
+        self.sort_expressions = sort_expressions
+        self.skip_number = skip_number
+        self.limit_number = limit_number
         self.session = None
         self.ignore_cache = ignore_cache
         self.pymongo_kwargs = pymongo_kwargs
@@ -94,6 +102,13 @@ class AggregationQuery(
         match_pipeline: List[Mapping[str, Any]] = (
             [{"$match": self.find_query}] if self.find_query else []
         )
+        sort_pipeline = {"$sort": {i[0]: i[1] for i in self.sort_expressions}}
+        if sort_pipeline["$sort"]:
+            match_pipeline.append(sort_pipeline)
+        if self.skip_number and self.skip_number != 0:
+            match_pipeline.append({"$skip": self.skip_number})
+        if self.limit_number and self.limit_number != 0:
+            match_pipeline.append({"$limit": self.limit_number})
         projection_pipeline: List[Mapping[str, Any]] = []
         if self.projection_model:
             projection = get_projection(self.projection_model)

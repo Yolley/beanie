@@ -2,6 +2,7 @@ import pytest
 from pydantic import Field
 from pydantic.main import BaseModel
 
+from beanie.odm.enums import SortDirection
 from tests.odm.models import Sample
 
 
@@ -33,6 +34,37 @@ async def test_aggregate_with_filter(preset_documents):
     assert {"_id": "test_1", "total": 2} in result
     assert {"_id": "test_2", "total": 6} in result
     assert {"_id": "test_3", "total": 3} in result
+
+
+async def test_aggregate_with_limit(preset_documents):
+    q = Sample.find_all(limit=1).aggregate(
+        [{"$group": {"_id": "$string", "total": {"$sum": "$integer"}}}]
+    )
+    print(q.get_aggregation_pipeline())
+    assert q.get_aggregation_pipeline() == [
+        {"$limit": 1},
+        {"$group": {"_id": "$string", "total": {"$sum": "$integer"}}},
+    ]
+    result = await q.to_list()
+    assert len(result) == 1
+
+
+async def test_aggregate_with_sort(preset_documents):
+    q = Sample.find_all(sort="-integer").aggregate(
+        [{"$addFields": {"test": "value"}}]
+    )
+    assert q.get_aggregation_pipeline() == [
+        {"$sort": {"integer": SortDirection.DESCENDING}},
+        {"$addFields": {"test": "value"}},
+    ]
+    result = await q.to_list()
+    last_integer = None
+    for item in result:
+        if last_integer is None:
+            last_integer = item["integer"]
+            continue
+        assert last_integer >= item["integer"]
+        last_integer = item["integer"]
 
 
 async def test_aggregate_with_projection_model(preset_documents):
